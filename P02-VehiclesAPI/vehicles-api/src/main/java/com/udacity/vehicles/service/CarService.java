@@ -1,8 +1,13 @@
 package com.udacity.vehicles.service;
 
+import com.udacity.vehicles.client.maps.Address;
+import com.udacity.vehicles.client.prices.Price;
+import com.udacity.vehicles.domain.Location;
 import com.udacity.vehicles.domain.car.Car;
 import com.udacity.vehicles.domain.car.CarRepository;
 import java.util.List;
+import java.util.Optional;
+
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 
@@ -49,6 +54,13 @@ public class CarService {
          */
         Car car = new Car();
 
+        Optional<Car> optionalCar = repository.findById(id);
+        if (optionalCar.isPresent()) {
+            car = optionalCar.get();
+        } else {
+            throw new CarNotFoundException();
+        }
+
         /**
          * TODO: Use the Pricing Web client you create in `VehiclesApiApplication`
          *   to get the price based on the `id` input'
@@ -56,7 +68,14 @@ public class CarService {
          * Note: The car class file uses @transient, meaning you will need to call
          *   the pricing service each time to get the price.
          */
+        Price price = pricing.get()
+                .uri("http://localhost:8082/prices/" + id)
+                .exchange()
+                .block()
+                .bodyToMono(Price.class)
+                .block();
 
+        car.setPrice(price.getPrice() + "");
 
         /**
          * TODO: Use the Maps Web client you create in `VehiclesApiApplication`
@@ -66,7 +85,21 @@ public class CarService {
          * Note: The Location class file also uses @transient for the address,
          * meaning the Maps service needs to be called each time for the address.
          */
+        Location location = car.getLocation();
+        String lat = location.getLat() + "";
+        String lon = location.getLon() + "";
 
+        Address address = maps.get()
+                .uri("http://localhost:9191/maps?lat=" + lat + "&lon=" + lon)
+                .exchange()
+                .block()
+                .bodyToMono(Address.class)
+                .block();
+
+        location.setAddress(address.getAddress());
+        location.setCity(address.getCity());
+        location.setState(address.getState());
+        location.setZip(address.getZip());
 
         return car;
     }
